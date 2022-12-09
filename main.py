@@ -4,6 +4,11 @@ import shutil
 from threading import Thread
 from time import sleep
 
+
+INDIVIDUAL_VIDEO = 1
+PLAY_LIST        = 2
+INVALID_URL      = 3
+
 def get_playlist(url: str) -> Playlist:
     try:
         return Playlist(url)
@@ -63,10 +68,13 @@ def download(url_data):
             end=''
         )
         current_video['downloaded'] = False
-        video.streams.get_highest_resolution().download(
-            directory,
-            '{}-{}.{}'.format(url_data['index'], current_video['title'], extension)
-        )
+        if directory:
+            video.streams.get_highest_resolution().download(
+                directory,
+                '{}-{}.{}'.format(url_data['index'], current_video['title'], extension)
+            )
+        else:
+            video.streams.get_highest_resolution().download()
         while not current_video['downloaded']:
             sleep(.5)
             pass
@@ -82,29 +90,50 @@ def create_directory(directory: str):
     except:
         return False
 
+def get_URL_type(url: str):
+    if url.startswith('https://www.youtube.com/watch?'):
+        url_parts = url.split('?')
+        url_type = INDIVIDUAL_VIDEO
+        if len(url_parts) > 1:
+            query = url_parts[1]
+            params = query.split('&')
+            for param in params:
+                if param.startswith('list='):
+                    url_type = PLAY_LIST
+        return url_type
+    return INVALID_URL
+
 if __name__ == '__main__':
     url = input('Enter playlist link : ')
-    playlist = get_playlist(url)
-    directory = remove_special_characters(playlist.title)
-    create_directory(directory)
-    
-    if playlist:
-        index = 0
-        urls = []
-        for url in playlist.video_urls:
-            urls.append({
-                'url': url,
-                'index': 'V-' + str(index).zfill(4),
-                'attempts': 3
-            })
-            index += 1
-        while urls:
-            url = urls.pop(0)
-            if not download(url):
-                url['attempts'] -= 1
-                if url['attempts'] > 0:
-                    urls.append(url)
-                print('failed to download {}'.format(current_video['title']))
-    else:
-        print('unable to get playlist')
+    url_type = get_URL_type(url)
 
+    if url_type != INVALID_URL:
+        if url_type == PLAY_LIST:
+            playlist = get_playlist(url)
+            directory = remove_special_characters(playlist.title)
+            create_directory(directory)
+            
+            if playlist:
+                index = 0
+                urls = []
+                for url in playlist.video_urls:
+                    urls.append({
+                        'url': url,
+                        'index': 'V-' + str(index).zfill(4),
+                        'attempts': 3
+                    })
+                    index += 1
+                while urls:
+                    url = urls.pop(0)
+                    if not download(url):
+                        url['attempts'] -= 1
+                        if url['attempts'] > 0:
+                            urls.append(url)
+                        print('failed to download {}'.format(current_video['title']))
+            else:
+                print('unable to get playlist')
+        else:
+            if not download({'url': url}):
+                print('unable to download')
+    else:
+        print('invalid URL')
