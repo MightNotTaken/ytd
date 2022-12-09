@@ -1,7 +1,5 @@
 from pytube import Playlist, YouTube
 import os
-import shutil
-from threading import Thread
 from time import sleep
 
 
